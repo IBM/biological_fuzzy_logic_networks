@@ -25,7 +25,7 @@ from biological_fuzzy_logic_networks.biofuzzdataset import BioFuzzDataset
 from biological_fuzzy_logic_networks.utils import (
     has_cycle,
     read_sif,
-    MSE_loss,
+    LossFactory,
 )  # , weighted_loss
 
 
@@ -33,7 +33,7 @@ class BioFuzzNet(DiGraph):
     """This class represents a BioFuzzNet, that is a Boolean biological network
     on which fuzzy logic operations can be implemented."""
 
-    def __init__(self, nodes=None, edges=None):
+    def __init__(self, nodes=None, edges=None, n=2, K=0.5, loss_function: str = "MSE"):
         """
         Initialise a BioFuzzNet.
         Logical AND gates should be defined in the nodes and edges list, by having a node name
@@ -49,6 +49,8 @@ class BioFuzzNet(DiGraph):
 
         """
         super().__init__()
+
+        self.loss_fn = LossFactory[loss_function]
 
         if nodes is not None and edges is not None:
             # Start by building the graph
@@ -74,7 +76,7 @@ class BioFuzzNet(DiGraph):
                     self.add_negative_edge(edge, not_count)
                 else:
                     if self.nodes()[edge[0]]["node_type"] == "biological":
-                        self.add_transfer_edge(edge[0], edge[1])
+                        self.add_transfer_edge(edge[0], edge[1], n=n, K=K)
                     else:
                         self.add_simple_edge(edge[0], edge[1])
 
@@ -184,6 +186,8 @@ class BioFuzzNet(DiGraph):
         self,
         upstream_node: str,
         downstream_node: str,
+        K=0.5,
+        n=2,
     ) -> None:
         """
         Add transfer directed edge (with a Hill transfer function) to the network
@@ -214,7 +218,7 @@ class BioFuzzNet(DiGraph):
             upstream_node,
             downstream_node,
             edge_type="transfer_function",
-            layer=HillTransferFunction(),
+            layer=HillTransferFunction(K=K, n=n),
             weight=1,
         )
 
@@ -313,7 +317,9 @@ class BioFuzzNet(DiGraph):
                 )
 
     @classmethod
-    def build_BioFuzzNet_from_file(cls, filepath: str):
+    def build_BioFuzzNet_from_file(
+        cls, filepath: str, n=2, K=0.5, loss_function: str = "MSE"
+    ):
         """
         An alternate constructor to build the BioFuzzNet from the sif file instead of the lists of nodes and edges.
         AND gates should already be specified in the sif file, and should be named node1_and_node2 where node1 and node2 are the incoming nodes
@@ -325,7 +331,7 @@ class BioFuzzNet(DiGraph):
 
         """
         nodes, edges = read_sif(filepath)
-        return BioFuzzNet(nodes, edges)
+        return BioFuzzNet(nodes, edges, n=n, K=K, loss_function=loss_function)
 
     # Setter Methods
     def initialise_random_truth_and_output(self, batch_size):
@@ -720,7 +726,7 @@ class BioFuzzNet(DiGraph):
         """
         The main function of this class.
         Optimise the tranfer function parameters in a FIXED topology with FIXED input gates.
-        For the moment, the optimizer is ADAM and the loss function is the MSELoss over all observed nodes (see utils.MSE_Loss)
+        For the moment, the optimizer is ADAM and the loss function
         Method overview:
             The graph states are updated by traversing the graph from root node to leaf node (forward pass).
             The transfer function parameters are then updated using backpropagation.
@@ -794,7 +800,7 @@ class BioFuzzNet(DiGraph):
                 # Get the predictions
                 predictions = self.output_states
 
-                loss = MSE_loss(predictions=predictions, ground_truth=y_batch)
+                loss = self.loss_fn(predictions=predictions, ground_truth=y_batch)
 
                 # First reset then compute the gradients
                 optim.zero_grad()
@@ -830,7 +836,7 @@ class BioFuzzNet(DiGraph):
                 self.sequential_update(input_nodes)
                 # Get the predictions
                 predictions = self.output_states
-                test_loss = MSE_loss(
+                test_loss = self.loss_fn(
                     predictions=predictions, ground_truth=test_ground_truth
                 )
 

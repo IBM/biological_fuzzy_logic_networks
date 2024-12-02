@@ -12,6 +12,31 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+class MSLELoss(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.mse = torch.nn.MSELoss()
+
+    def forward(self, pred, actual):
+        return self.mse(torch.log(pred + 1), torch.log(actual + 1))
+
+
+class MAPELoss(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, pred, actual):
+        return (actual - pred).abs() / actual.abs()
+
+
+class SMAPELoss(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, pred, actual):
+        return (actual - pred).abs() / (actual.abs() + pred.abs())
+
+
 def read_sif(filepath: str) -> Tuple[list, dict]:
     """
     Read a SIF file and returns the list of node names and a dictionnary mapping edges to their weight.
@@ -121,12 +146,92 @@ def MSE_loss(predictions: dict, ground_truth: dict) -> torch.Tensor:
     mse_loss = torch.nn.MSELoss(reduction="none")
     squared_loss = mse_loss(predictions, ground_truth)
 
-    # Then I can average however I want
-    # I will then average over the network nodes
+    # Average over the network nodes
     loss = torch.mean(squared_loss, 0)
 
-    # Then I average over the batch
+    # Average over the batch
     loss = torch.mean(loss)
+    return loss
+
+
+def MSLE_loss(predictions: dict, ground_truth: dict) -> torch.Tensor:
+    """
+    Compute the Mean Squared Logarithmic Error loss over all nodes of the network
+    Args :
+        - predictions: dict mapping each node to its predicted value
+        - ground_truth: dict mapping each node to its ground_truth.
+            Unobserved nodes should not be present in ground truth.
+    Returns:
+        - a torch.tensor containing the minibatch MSLE loss over all observed nodes in ground_truth
+    """
+    # Remove unobserved nodes from the prediction
+    # And reorder the predictions to be in the same order as the ground truth
+    predictions = {key: predictions[key] for key in ground_truth.keys()}
+
+    # Get the matrices
+    predictions = dictionnary_to_tensor(predictions)
+    ground_truth = dictionnary_to_tensor(ground_truth)
+
+    # Compute the squared loss without any reduction
+    msle_loss_fn = MSLELoss()
+    msle_loss = msle_loss_fn(predictions, ground_truth)
+
+    # Then average over the batch
+    loss = msle_loss.mean()
+    return loss
+
+
+def MAPE_loss(predictions: dict, ground_truth: dict) -> torch.Tensor:
+    """
+    Compute the Mean Absolute Percenage Error loss over all nodes of the network
+    Args :
+        - predictions: dict mapping each node to its predicted value
+        - ground_truth: dict mapping each node to its ground_truth.
+            Unobserved nodes should not be present in ground truth.
+    Returns:
+        - a torch.tensor containing the minibatch MAPE loss over all observed nodes in ground_truth
+    """
+    # Remove unobserved nodes from the prediction
+    # And reorder the predictions to be in the same order as the ground truth
+    predictions = {key: predictions[key] for key in ground_truth.keys()}
+
+    # Get the matrices
+    predictions = dictionnary_to_tensor(predictions)
+    ground_truth = dictionnary_to_tensor(ground_truth)
+
+    # Compute the squared loss without any reduction
+    mape_loss_fn = MAPELoss()
+    mape_loss = mape_loss_fn(predictions, ground_truth)
+
+    # Then average over the batch
+    loss = mape_loss.mean()
+    return loss
+
+
+def SMAPE_loss(predictions: dict, ground_truth: dict) -> torch.Tensor:
+    """
+    Compute the Symmetric Mean Absolute Percentage Error loss over all nodes of the network
+    Args :
+        - predictions: dict mapping each node to its predicted value
+        - ground_truth: dict mapping each node to its ground_truth.
+            Unobserved nodes should not be present in ground truth.
+    Returns:
+        - a torch.tensor containing the minibatch SMAPE loss over all observed nodes in ground_truth
+    """
+    # Remove unobserved nodes from the prediction
+    # And reorder the predictions to be in the same order as the ground truth
+    predictions = {key: predictions[key] for key in ground_truth.keys()}
+
+    # Get the matrices
+    predictions = dictionnary_to_tensor(predictions)
+    ground_truth = dictionnary_to_tensor(ground_truth)
+
+    # Compute the squared loss without any reduction
+    smape_loss_fn = SMAPELoss()
+    smape_loss = smape_loss_fn(predictions, ground_truth)
+
+    # Then average over the batch
+    loss = smape_loss.mean()
     return loss
 
 
@@ -256,3 +361,12 @@ def plot_edge_function(transfer_edge, low=0, high=1):
     hill.forward(xaxis)
     plt.plot(xaxis, hill.output_value.detach().numpy())
     plt.show()
+
+
+LossFactory = {
+    "MAPE": MAPE_loss,
+    "SMAPE": SMAPE_loss,
+    "MSLE": MSLE_loss,
+    "MSE": MSE_loss,
+    "MSE_entropy": MSE_entropy_loss,
+}

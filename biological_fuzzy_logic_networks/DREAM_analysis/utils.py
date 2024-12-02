@@ -65,7 +65,6 @@ def prepare_cell_line_data(
     filter_starved_stim: bool = True,
     **extras,
 ):
-    print(type(data_file))
     if isinstance(data_file, str):
         cl_data = pd.read_csv(data_file)
     elif isinstance(data_file, List):
@@ -77,7 +76,6 @@ def prepare_cell_line_data(
     else:
         raise Exception("`data_file` should be a string or list of strings")
 
-    print(cl_data["cell_line"].unique())
     data_to_nodes_map = data_to_nodes_mapping()
     inhibitor_map = inhibitor_mapping()
 
@@ -280,18 +278,20 @@ def cl_data_to_input(
     )
 
     if not scaler and not scale_type:
-        raise Warning("No scaler type or scaler provided, using unscaled data")
+        print("No scaler type or scaler provided, using unscaled data")
     if scaler:
         if scaler and scale_type:
-            raise Warning("Scaler provided, ignoring `scale type`")
+            print("Scaler provided, ignoring `scale type`")
         train[markers] = scaler.transform(train[markers])
         t = train[markers]
-        t[t < 0] = 0
+        t[t < 0] = 1e-9
+        t[t > 1] = 1
         train[markers] = t
         if valid is not None:
             valid[markers] = scaler.transform(valid[markers])
             t = valid[markers]
-            t[t < 0] = 0
+            t[t < 0] = 1e-9
+            t[t > 1] = 1
             valid[markers] = t
     elif not scaler and scale_type:
         scaler = get_scaler(scale_type)
@@ -300,7 +300,8 @@ def cl_data_to_input(
         if valid is not None:
             valid[markers] = scaler.transform(valid[markers])
             t = valid[markers]
-            t[t < 0] = 0
+            t[t < 0] = 1e-9
+            t[t > 1] = 1
             valid[markers] = t
 
     if add_root_values:

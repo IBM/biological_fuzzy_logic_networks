@@ -7,7 +7,7 @@ ALL RIGHTS RESERVED
 # modules defined in biofuzznet/
 # Pylance throws a reportMissingImports but thos actually works.
 from biological_fuzzy_logic_networks.utils import (
-    MSE_entropy_loss,
+    LossFactory,
     read_sif,
 )  # weighted_and_mixed_loss
 from biological_fuzzy_logic_networks.biofuzznet import BioFuzzNet
@@ -36,6 +36,8 @@ class BioMixNet(BioFuzzNet):
         nodes=None,
         edges=None,
         AND_param=0.0,
+        loss_function: str = "MSE",
+        gate_loss_function: str = "MSE_entropy",
     ):
         """
         Initialises a BioMixNet.
@@ -50,6 +52,7 @@ class BioMixNet(BioFuzzNet):
                     is assumed to be 1 - AND_param
         """
         super().__init__(nodes, edges)
+        self.gate_loss_fn = LossFactory[gate_loss_function]
 
         # for node in self.nodes():
         #     if self.nodes()[node]["node_type"] in ["logic_gate_AND", "logic_gate_OR"]:
@@ -60,7 +63,11 @@ class BioMixNet(BioFuzzNet):
         #             OR_function=self.integrate_OR,
         #         )
 
-    def build_BioMixNet_from_file(filepath: str):
+    def build_BioMixNet_from_file(
+        filepath: str,
+        loss_function: str = "MSE",
+        gate_loss_function: str = "MSE_entropy",
+    ):
         """
         An alternate constructor to build the BioMixNet from the sif file instead of the lists of ndoes and edges.
         AND gates should already be specified in the sif file, and should be named node1_and_node2 where node1 and node2 are the incoming nodes
@@ -72,7 +79,12 @@ class BioMixNet(BioFuzzNet):
 
         """
         nodes, edges = read_sif(filepath)
-        return BioMixNet(nodes, edges)
+        return BioMixNet(
+            nodes,
+            edges,
+            loss_function=loss_function,
+            gate_loss_function=gate_loss_function,
+        )
 
     @property
     def mixed_gates(self):
@@ -236,7 +248,7 @@ class BioMixNet(BioFuzzNet):
                 # Get the predictions
                 predictions = self.output_states
 
-                loss = MSE_entropy_loss(
+                loss = self.gate_loss_fn(
                     predictions=predictions,
                     ground_truth=y_batch,
                     gates=[self.nodes[node]["gate"] for node in self.mixed_gates],
@@ -275,7 +287,7 @@ class BioMixNet(BioFuzzNet):
                 self.sequential_update(input_nodes)
                 # Get the predictions
                 predictions = self.output_states
-                test_loss = MSE_entropy_loss(
+                test_loss = self.gate_loss_fn(
                     predictions=predictions,
                     ground_truth=test_ground_truth,
                     gates=[self.nodes[node]["gate"] for node in self.mixed_gates],
