@@ -59,7 +59,7 @@ def run_train_with_noise(
         "epochs": 100,
         "batch_size": 500,
         "learning_rate": 0.001,
-        "tensors_to_cuda": True,
+        # "tensors_to_cuda": True,
     },
     **extras,
 ):
@@ -135,7 +135,7 @@ def run_train_with_noise(
     val_inhibitors = {c: torch.ones(val_size) for c in val_dict.keys()}
 
     student_network.initialise_random_truth_and_output(
-        train_size, to_cuda=BFN_training_params["tensors_to_cuda"]
+        train_size,  # to_cuda=BFN_training_params["tensors_to_cuda"]
     )
     losses, curr_best_val_loss, _ = student_network.conduct_optimisation(
         input=train_input_dict,
@@ -154,16 +154,16 @@ def run_train_with_noise(
     no_inhibition_test = {k: torch.ones(test_size) for k in student_network.nodes}
     with torch.no_grad():
         student_network.initialise_random_truth_and_output(
-            test_size, to_cuda=BFN_training_params["tensors_to_cuda"]
+            test_size,  #  to_cuda=BFN_training_params["tensors_to_cuda"]
         )
         student_network.set_network_ground_truth(
-            test_ground_truth, to_cuda=BFN_training_params["tensors_to_cuda"]
+            test_ground_truth,  # to_cuda=BFN_training_params["tensors_to_cuda"]
         )
 
         student_network.sequential_update(
             student_network.root_nodes,
             inhibition=no_inhibition_test,
-            to_cuda=BFN_training_params["tensors_to_cuda"],
+            # to_cuda=BFN_training_params["tensors_to_cuda"],
         )
         test_output = {
             k: v.cpu()
@@ -175,12 +175,12 @@ def run_train_with_noise(
     # TEST student network without perturbation, random inputs
     with torch.no_grad():
         student_network.initialise_random_truth_and_output(
-            test_size, to_cuda=BFN_training_params["tensors_to_cuda"]
+            test_size,  # to_cuda=BFN_training_params["tensors_to_cuda"]
         )
         student_network.sequential_update(
             student_network.root_nodes,
             inhibition=no_inhibition_test,
-            to_cuda=BFN_training_params["tensors_to_cuda"],
+            # to_cuda=BFN_training_params["tensors_to_cuda"],
         )
         test_random_output = {
             k: v.cpu()
@@ -294,18 +294,18 @@ def main(config_path):
 
         losses, unpertubed_data, student, scaler = run_train_with_noise(**config)
 
-        losses.to_csv(f"{out_dir}{i+1}_losses.csv")
-        unpertubed_data.to_csv(f"{out_dir}{i+1}_unperturbed.csv")
+        # losses.to_csv(f"{out_dir}{i+1}_losses.csv")
+        # unpertubed_data.to_csv(f"{out_dir}{i+1}_unperturbed.csv")
 
-        torch.save({"model_state_dict": student}, f"{out_dir}{i+1}_student.pt")
+        # torch.save({"model_state_dict": student}, f"{out_dir}{i+1}_student.pt")
 
         del student
 
-        with open(f"{out_dir}{i+1}_config.json", "w") as f:
-            json.dump(config, f)
+        # with open(f"{out_dir}{i+1}_config.json", "w") as f:
+        #     json.dump(config, f)
 
-        with open(f"{out_dir}{i+1}_scaler.json", "wb") as f:
-            pickle.dump(scaler, f)
+        # with open(f"{out_dir}{i+1}_scaler.json", "wb") as f:
+        #     pickle.dump(scaler, f)
 
 
 if __name__ == "__main__":

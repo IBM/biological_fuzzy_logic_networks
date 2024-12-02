@@ -34,8 +34,8 @@ class HillTransferFunction(torch.nn.Module):
         """
         # Hill function as in Eduati et al. Cancer Research 2017
         # https://doi.org/10.1158/0008-5472.CAN-17-0078
-        K = torch.exp(self.K)  # Ensure non-negative parameters
-        n = 1 + torch.exp(self.n)  # 1 + n to ensure n > 1
+        K = torch.exp(self.K).to(device)  # Ensure non-negative parameters
+        n = 1 + torch.exp(self.n).to(device)  # 1 + n to ensure n > 1
         x_min = 1 - x
 
         output = (x_min**n) / (K**n + x_min**n)

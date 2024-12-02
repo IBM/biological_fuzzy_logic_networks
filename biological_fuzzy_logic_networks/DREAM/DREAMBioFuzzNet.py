@@ -11,7 +11,7 @@ from torch.distributions.uniform import Uniform
 
 from biological_fuzzy_logic_networks.DREAM.DREAMdataset import DREAMBioFuzzDataset
 from biological_fuzzy_logic_networks.biofuzznet import BioFuzzNet
-from biological_fuzzy_logic_networks.utils import MSE_loss, read_sif, MSE_entropy_loss
+from biological_fuzzy_logic_networks.utils import LossFactory, read_sif
 from biological_fuzzy_logic_networks.utils import has_cycle
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -482,7 +482,7 @@ class DREAMMixIn:
         """
         The main function of this class.
         Optimise the tranfer function parameters in a FIXED topology with FIXED input gates.
-        For the moment, the optimizer is ADAM and the loss function is the MSELoss over all observed nodes (see utils.MSE_Loss)
+        For the moment, the optimizer is ADAM
         Method overview:
             The graph states are updated by traversing the graph from root node to leaf node (forward pass).
             The transfer function parameters are then updated using backpropagation.
@@ -583,11 +583,11 @@ class DREAMMixIn:
                 # predictions = self.output_states
                 labels = {k: v for k, v in y_batch.items() if k in predictions}
 
-                loss = MSE_loss(predictions=predictions, ground_truth=labels)
+                loss = self.loss_fn(predictions=predictions, ground_truth=labels)
 
                 # First reset then compute the gradients
                 optim.zero_grad()
-                loss.backward(retain_graph=True)
+                loss.backward(retain_graph=False)
 
                 torch.nn.utils.clip_grad_value_(parameters, clip_value=0.5)
                 # torch.nn.utils.clip_grad_norm_(parameters, max_norm=1)
@@ -635,7 +635,7 @@ class DREAMMixIn:
                     k: v for k, v in valid_ground_truth.items() if k in predictions
                 }
                 # predictions = self.output_states
-                valid_loss = MSE_loss(predictions=predictions, ground_truth=labels)
+                valid_loss = self.loss_fn(predictions=predictions, ground_truth=labels)
 
                 # No need to detach since there are no gradients
                 if logger is not None:
@@ -764,12 +764,18 @@ class DREAMMixIn:
 
 
 class DREAMBioFuzzNet(DREAMMixIn, BioFuzzNet):
-    def __init__(self, nodes=None, edges=None, n=2, K=0.5):
-        super(DREAMBioFuzzNet, self).__init__(nodes, edges, n=n, K=K)
+    def __init__(self, nodes=None, edges=None, n=2, K=0.5, loss_function: str = "MSE"):
+        super(DREAMBioFuzzNet, self).__init__(
+            nodes, edges, n=n, K=K, loss_function=loss_function
+        )
 
     @classmethod
     def build_DREAMBioFuzzNet_from_file(
-        cls, filepath: str, n: float = 2.0, K: float = 0.5
+        cls,
+        filepath: str,
+        n: float = 2.0,
+        K: float = 0.5,
+        loss_function: str = "MSE",
     ):
         """
         An alternate constructor to build the BioFuzzNet from the sif file instead of the lists of nodes and edges.
@@ -782,12 +788,24 @@ class DREAMBioFuzzNet(DREAMMixIn, BioFuzzNet):
 
         """
         nodes, edges = read_sif(filepath)
-        return DREAMBioFuzzNet(nodes, edges, n=n, K=K)
+        return DREAMBioFuzzNet(nodes, edges, n=n, K=K, loss_function=loss_function)
 
 
 class DREAMBioMixNet(DREAMMixIn, BioFuzzNet):
-    def __init__(self, nodes=None, edges=None, AND_param: float = 0.0, n=2, K=0.5):
-        super(DREAMBioMixNet, self).__init__(nodes, edges, n=n, K=K)
+    def __init__(
+        self,
+        nodes=None,
+        edges=None,
+        AND_param: float = 0.0,
+        n=2,
+        K=0.5,
+        loss_function: str = "MSE",
+        gate_loss_function: str = "MSE_entropy",
+    ):
+        super(DREAMBioMixNet, self).__init__(
+            nodes, edges, n=n, K=K, loss_function=loss_function
+        )
+        self.gate_loss_fn = LossFactory[gate_loss_function]
 
         for node in self.nodes():
             if self.nodes()[node]["node_type"] in ["logic_gate_AND", "logic_gate_OR"]:
@@ -799,7 +817,14 @@ class DREAMBioMixNet(DREAMMixIn, BioFuzzNet):
                 )
 
     @classmethod
-    def build_DREAMBioMixNet_from_file(cls, filepath: str, n=2, K=0.5):
+    def build_DREAMBioMixNet_from_file(
+        cls,
+        filepath: str,
+        n=2,
+        K=0.5,
+        loss_function: str = "MSE",
+        gate_loss_function: str = "MSE_entropy",
+    ):
         """
         An alternate constructor to build the BioFuzzNet from the sif file instead of the lists of nodes and edges.
         AND gates should already be specified in the sif file, and should be named node1_and_node2 where node1 and node2 are the incoming nodes
@@ -811,7 +836,14 @@ class DREAMBioMixNet(DREAMMixIn, BioFuzzNet):
 
         """
         nodes, edges = read_sif(filepath)
-        return DREAMBioMixNet(nodes, edges, n=n, K=K)
+        return DREAMBioMixNet(
+            nodes,
+            edges,
+            n=n,
+            K=K,
+            loss_function=loss_function,
+            gate_loss_function=gate_loss_function,
+        )
 
     @property
     def mixed_gates(self):
@@ -903,7 +935,7 @@ class DREAMBioMixNet(DREAMMixIn, BioFuzzNet):
         """
         The main function of this class.
         Optimise the tranfer function parameters in a FIXED topology with FIXED input gates.
-        For the moment, the optimizer is ADAM and the loss function is the MSELoss over all observed nodes (see utils.MSE_Loss)
+        For the moment, the optimizer is ADAM
         Method overview:
             The graph states are updated by traversing the graph from root node to leaf node (forward pass).
             The transfer function parameters are then updated using backpropagation.
@@ -1008,7 +1040,7 @@ class DREAMBioMixNet(DREAMMixIn, BioFuzzNet):
                     k: v for k, v in self.output_states.items() if k not in input_nodes
                 }
                 labels = {k: v for k, v in y_batch.items() if k in predictions}
-                loss = MSE_entropy_loss(
+                loss = self.gate_loss_fn(
                     predictions=predictions,
                     ground_truth=labels,
                     gates=[self.nodes[node]["gate"] for node in self.mixed_gates],
@@ -1017,7 +1049,7 @@ class DREAMBioMixNet(DREAMMixIn, BioFuzzNet):
 
                 # First reset then compute the gradients
                 optim.zero_grad()
-                loss.backward(retain_graph=True)
+                loss.backward(retain_graph=False)
 
                 torch.nn.utils.clip_grad_value_(parameters, clip_value=0.5)
                 # Update the parameters
@@ -1066,7 +1098,7 @@ class DREAMBioMixNet(DREAMMixIn, BioFuzzNet):
                     k: v for k, v in valid_ground_truth.items() if k in predictions
                 }
                 # predictions = self.output_states
-                valid_loss = MSE_entropy_loss(
+                valid_loss = self.gate_loss_fn(
                     predictions=predictions,
                     ground_truth=labels,
                     gates=[self.nodes[node]["gate"] for node in self.mixed_gates],

@@ -25,7 +25,7 @@ markers_to_predict = [
 cont_features = ["AMPK", "SMAD23", "AKT_S473", "AKT_T308", "SRC", "MKK4", "MEK12"]
 
 
-cell_line = "MFM223"  # train cell lines
+cell_line = "HCC70"  # train cell lines
 treatment = "EGF"
 
 # cl_data = pd.read_csv(
@@ -47,11 +47,11 @@ treatment = "EGF"
 
 # Train and valid data are scaled between 0 and 1
 train = pd.read_csv(
-    "/dccstor/ipc1/CAR/DREAM/Model/Test/After_synthetic/MFM223/train_data.csv",
+    f"/dccstor/ipc1/CAR/DREAM/Model/Test/After_synthetic/{cell_line}/train_data.csv",
     index_col=0,
 )
 test = pd.read_csv(
-    "/dccstor/ipc1/CAR/DREAM/Model/Test/After_synthetic/MFM223/valid_data.csv",
+    f"/dccstor/ipc1/CAR/DREAM/Model/Test/After_synthetic/{cell_line}/valid_data.csv",
     index_col=0,
 )
 
@@ -60,10 +60,10 @@ lm.fit(train[cont_features], train[markers_to_predict])
 pred = pd.DataFrame(lm.predict(test[cont_features]), columns=markers_to_predict)
 
 pred.to_csv(
-    f"/dccstor/ipc1/CAR/DREAM/Model/Baseline/LM_OneCellLineOneTreatment/{cell_line}_{treatment}_predictions.csv"
+    f"/dccstor/ipc1/CAR/DREAM/Model/Test/After_synthetic/{cell_line}/LM_{cell_line}_{treatment}_predictions.csv"
 )
 with open(
-    f"/dccstor/ipc1/CAR/DREAM/Model/Baseline/LM_OneCellLineOneTreatment/{cell_line}_{treatment}_LM.pkl",
+    f"/dccstor/ipc1/CAR/DREAM/Model/Test/After_synthetic/{cell_line}/LM_{cell_line}_{treatment}.pkl",
     "wb",
 ) as f:
     pickle.dump(lm, f)

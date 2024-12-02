@@ -36,6 +36,7 @@ def train_network(
     network_class: str,
     data_file: Union[List, str],
     output_dir: str,
+    loss_function: str = "MSE",
     time_point: int = 9,
     non_marker_cols: Sequence[str] = (
         "treatment",
@@ -66,9 +67,11 @@ def train_network(
     convergence_check: bool = False,
     shuffle_nodes: bool = False,
     patience: int = 20,
-    **extras,
 ):
-    model = DREAMBioFuzzNet.build_DREAMBioFuzzNet_from_file(pkn_sif)
+    model = DREAMBioFuzzNet.build_DREAMBioFuzzNet_from_file(
+        pkn_sif, loss_function=loss_function
+    )
+
     cl_data = prepare_cell_line_data(
         data_file=data_file,
         time_point=time_point,
@@ -153,7 +156,6 @@ def train_network(
     with torch.no_grad():
         model.initialise_random_truth_and_output(len(valid))
         model.set_network_ground_truth(valid_data)
-        print(model.output_states)
         model.sequential_update(model.root_nodes, valid_inhibitors)
         val_output_states = pd.DataFrame(
             {k: v.cpu().numpy() for k, v in model.output_states.items()}
