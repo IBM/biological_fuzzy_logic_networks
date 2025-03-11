@@ -1,4 +1,5 @@
 from biological_fuzzy_logic_networks.DREAM import DREAMBioFuzzNet
+from biological_fuzzy_logic_networks.utils import make_hill_identity
 
 # from biological_fuzzy_logic_networks.DREAM_analysis.train_network import get_environ_var
 # from app_tunnel.apps import mlflow_tunnel
@@ -34,9 +35,11 @@ def run_sim_and_baselines(
     student_network = DREAMBioFuzzNet.DREAMBioFuzzNet.build_DREAMBioFuzzNet_from_file(
         pkn_path
     )
-    untrained_network = DREAMBioFuzzNet.DREAMBioFuzzNet.build_DREAMBioFuzzNet_from_file(
+    nohill_network = DREAMBioFuzzNet.DREAMBioFuzzNet.build_DREAMBioFuzzNet_from_file(
         pkn_path
     )
+
+    make_hill_identity(nohill_network)
 
     # INHIBITION INPUTS
     no_inhibition = {k: torch.ones(train_size) for k in teacher_network.nodes}
@@ -51,13 +54,13 @@ def run_sim_and_baselines(
             teacher_network.root_nodes, inhibition=no_inhibition
         )
         true_unperturbed_data = {
-            k: v.numpy()
+            k: v.cpu().numpy()
             for k, v in teacher_network.output_states.items()
             if k not in teacher_network.root_nodes
         }
         input_data = pd.DataFrame(
             {
-                k: v.numpy()
+                k: v.cpu().numpy()
                 for k, v in teacher_network.output_states.items()
                 if k in teacher_network.root_nodes
             }
@@ -83,7 +86,7 @@ def run_sim_and_baselines(
             if k in teacher_network.root_nodes
         }
 
-        test_true_df = pd.DataFrame({k: v.numpy() for k, v in test_data.items()})
+        test_true_df = pd.DataFrame({k: v.cpu().numpy() for k, v in test_data.items()})
 
     # Generate test data with perturbation
     # Introduce perturbation
@@ -111,7 +114,9 @@ def run_sim_and_baselines(
             if k in teacher_network.root_nodes
         }
 
-        perturb_true_df = pd.DataFrame({k: v.numpy() for k, v in perturb_data.items()})
+        perturb_true_df = pd.DataFrame(
+            {k: v.cpu().numpy() for k, v in perturb_data.items()}
+        )
 
     # Train student on unperturbed training data
     # Split train data in training and validation data
@@ -163,7 +168,7 @@ def run_sim_and_baselines(
             teacher_network.root_nodes, inhibition=perturb_inhibition
         )
         true_with_i_data = {
-            k: v.numpy()
+            k: v.cpu().numpy()
             for k, v in teacher_network.output_states.items()
             if k not in teacher_network.root_nodes
         }
@@ -176,7 +181,7 @@ def run_sim_and_baselines(
             teacher_network.root_nodes, inhibition=perturb_inhibition
         )
         true_wo_i_data = {
-            k: v.numpy()
+            k: v.cpu().numpy()
             for k, v in teacher_network.output_states.items()
             if k not in teacher_network.root_nodes
         }
@@ -198,7 +203,9 @@ def run_sim_and_baselines(
             for k, v in student_network.output_states.items()
             if k not in student_network.root_nodes
         }
-        test_output_df = pd.DataFrame({k: v.numpy() for k, v in test_output.items()})
+        test_output_df = pd.DataFrame(
+            {k: v.cpu().numpy() for k, v in test_output.items()}
+        )
 
     # TEST student network without perturbation, random inputs
     with torch.no_grad():
@@ -213,7 +220,7 @@ def run_sim_and_baselines(
             if k not in student_network.root_nodes
         }
         test_random_output_df = pd.DataFrame(
-            {k: v.numpy() for k, v in test_random_output.items()}
+            {k: v.cpu().numpy() for k, v in test_random_output.items()}
         )
 
     # TEST student network with perturbation, same inputs
@@ -233,74 +240,74 @@ def run_sim_and_baselines(
             if k not in student_network.root_nodes
         }
         perturb_output_df = pd.DataFrame(
-            {k: v.numpy() for k, v in perturb_output.items()}
+            {k: v.cpu().numpy() for k, v in perturb_output.items()}
         )
 
     # TEST student network with perturbation, random inputs
     with torch.no_grad():
-        untrained_network.initialise_random_truth_and_output(test_size)
-        untrained_network.sequential_update(
-            untrained_network.root_nodes, inhibition=perturb_inhibition
+        nohill_network.initialise_random_truth_and_output(test_size)
+        nohill_network.sequential_update(
+            nohill_network.root_nodes, inhibition=perturb_inhibition
         )
         perturb_gen = {
-            k: v.numpy()
-            for k, v in untrained_network.output_states.items()
-            if k not in untrained_network.root_nodes
+            k: v.cpu().numpy()
+            for k, v in nohill_network.output_states.items()
+            if k not in nohill_network.root_nodes
         }
         perturb_gen_df = pd.DataFrame(perturb_gen)
 
-    # UNTRAINED NETWORK on perturbation, same inputs
+    # NoHill NETWORK on perturbation, same inputs
     with torch.no_grad():
-        untrained_network.initialise_random_truth_and_output(test_size)
-        untrained_network.set_network_ground_truth(perturb_ground_truth)
-        untrained_network.sequential_update(
+        nohill_network.initialise_random_truth_and_output(test_size)
+        nohill_network.set_network_ground_truth(perturb_ground_truth)
+        nohill_network.sequential_update(
             teacher_network.root_nodes, inhibition=perturb_inhibition
         )
         ut_perturb_with_input = {
-            k: v.numpy()
-            for k, v in untrained_network.output_states.items()
-            if k not in untrained_network.root_nodes
+            k: v.cpu().numpy()
+            for k, v in nohill_network.output_states.items()
+            if k not in nohill_network.root_nodes
         }
         ut_perturb_with_input_df = pd.DataFrame(ut_perturb_with_input)
 
-    # UNTRAINED NETWORK on perturbation, random inputs
+    # NoHill NETWORK on perturbation, random inputs
     with torch.no_grad():
-        untrained_network.initialise_random_truth_and_output(test_size)
-        untrained_network.sequential_update(
-            untrained_network.root_nodes, inhibition=perturb_inhibition
+        nohill_network.initialise_random_truth_and_output(test_size)
+        nohill_network.sequential_update(
+            nohill_network.root_nodes, inhibition=perturb_inhibition
         )
         ut_perturb = {
-            k: v.numpy()
-            for k, v in untrained_network.output_states.items()
-            if k not in untrained_network.root_nodes
+            k: v.cpu().numpy()
+            for k, v in nohill_network.output_states.items()
+            if k not in nohill_network.root_nodes
         }
 
         ut_perturb_df = pd.DataFrame(ut_perturb)
 
-    # UNTRAINED NETWORK without perturbation, same inputs
+    # NoHill NETWORK without perturbation, same inputs
     with torch.no_grad():
-        untrained_network.initialise_random_truth_and_output(test_size)
-        untrained_network.set_network_ground_truth(test_ground_truth)
-        untrained_network.sequential_update(
-            untrained_network.root_nodes, inhibition=no_inhibition_test
+        nohill_network.initialise_random_truth_and_output(test_size)
+        nohill_network.set_network_ground_truth(test_ground_truth)
+        nohill_network.sequential_update(
+            nohill_network.root_nodes, inhibition=no_inhibition_test
         )
         gen_with_i_test = {
-            k: v.numpy()
-            for k, v in untrained_network.output_states.items()
-            if k not in untrained_network.root_nodes
+            k: v.cpu().numpy()
+            for k, v in nohill_network.output_states.items()
+            if k not in nohill_network.root_nodes
         }
         ut_test_with_i_df = pd.DataFrame(gen_with_i_test)
 
-    # UNTRAINED NETWORK without perturbation, random inputs
+    # NoHill NETWORK without perturbation, random inputs
     with torch.no_grad():
-        untrained_network.initialise_random_truth_and_output(test_size)
-        untrained_network.sequential_update(
-            untrained_network.root_nodes, inhibition=no_inhibition_test
+        nohill_network.initialise_random_truth_and_output(test_size)
+        nohill_network.sequential_update(
+            nohill_network.root_nodes, inhibition=no_inhibition_test
         )
         gen_test = {
-            k: v.numpy()
-            for k, v in untrained_network.output_states.items()
-            if k not in untrained_network.root_nodes
+            k: v.cpu().numpy()
+            for k, v in nohill_network.output_states.items()
+            if k not in nohill_network.root_nodes
         }
         ut_test_df = pd.DataFrame(gen_test)
 
@@ -320,8 +327,8 @@ def run_sim_and_baselines(
             "teacher_division_random_input",
             "student_division_same_input",
             "student_division_random_input",
-            "untrained_division_same_input",
-            "untrained_division_random_input",
+            "nohill_division_same_input",
+            "nohill_division_random_input",
         ],
     )
 
@@ -337,8 +344,8 @@ def run_sim_and_baselines(
             "teacher_no_pertrub_true",
             "student_no_perturb_same_input",
             "student_no_perturb_random_input",
-            "untrained_no_perturb_same_input",
-            "untrained_no_perturb_random_input",
+            "nohill_no_perturb_same_input",
+            "nohill_no_perturb_random_input",
         ],
     )
 

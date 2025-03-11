@@ -5,27 +5,31 @@ import pandas as pd
 import pickle
 
 markers_to_predict = [
-    "RB",
     "p53",
-    "p38",
-    "JNK",
-    "GSK3B",
     "cleavedCas",
-    "MKK36",
+    "p38",
+    "RB",
     "MAPKAPK2",
-    "FAK",
     "CREB",
-    "H3",
     "p90RSK",
-    "ERK12",
+    "H3",
+    "MKK36",
 ]
 
 
 # Subnetwork inputs
-cont_features = ["AMPK", "SMAD23", "AKT_S473", "AKT_T308", "SRC", "MKK4", "MEK12"]
+cont_features = [
+    "AKT_S473",
+    "SMAD23",
+    "GSK3B",
+    "AKT_T308",
+    "SRC",
+    "MKK4",
+    "AMPK",
+    "ERK12",
+]
 
-
-cell_line = "HCC70"  # train cell lines
+cell_line = "MCF10A"  # train cell lines
 treatment = "EGF"
 
 # cl_data = pd.read_csv(
@@ -47,11 +51,11 @@ treatment = "EGF"
 
 # Train and valid data are scaled between 0 and 1
 train = pd.read_csv(
-    f"/dccstor/ipc1/CAR/DREAM/Model/Test/After_synthetic/{cell_line}/train_data.csv",
+    f"/dccstor/ipc1/CAR/DREAM/Model/Mini_subnetwork/{cell_line}/train_data.csv",
     index_col=0,
 )
 test = pd.read_csv(
-    f"/dccstor/ipc1/CAR/DREAM/Model/Test/After_synthetic/{cell_line}/valid_data.csv",
+    f"/dccstor/ipc1/CAR/DREAM/Model/Mini_subnetwork/{cell_line}/valid_data.csv",
     index_col=0,
 )
 
@@ -60,10 +64,10 @@ lm.fit(train[cont_features], train[markers_to_predict])
 pred = pd.DataFrame(lm.predict(test[cont_features]), columns=markers_to_predict)
 
 pred.to_csv(
-    f"/dccstor/ipc1/CAR/DREAM/Model/Test/After_synthetic/{cell_line}/LM_{cell_line}_{treatment}_predictions.csv"
+    f"/dccstor/ipc1/CAR/DREAM/Model/Mini_subnetwork/{cell_line}/LM_{cell_line}_{treatment}_predictions.csv"
 )
 with open(
-    f"/dccstor/ipc1/CAR/DREAM/Model/Test/After_synthetic/{cell_line}/LM_{cell_line}_{treatment}.pkl",
+    f"/dccstor/ipc1/CAR/DREAM/Model/Mini_subnetwork/{cell_line}/LM_{cell_line}_{treatment}.pkl",
     "wb",
 ) as f:
     pickle.dump(lm, f)

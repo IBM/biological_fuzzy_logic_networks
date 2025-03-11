@@ -1,4 +1,5 @@
 from biological_fuzzy_logic_networks.DREAM import DREAMBioFuzzNet
+from biological_fuzzy_logic_networks.utils import make_hill_identity
 
 import torch
 import numpy as np
@@ -67,9 +68,11 @@ def run_train_with_noise(
     student_network = DREAMBioFuzzNet.DREAMBioFuzzNet.build_DREAMBioFuzzNet_from_file(
         pkn_path
     )
-    untrained_network = DREAMBioFuzzNet.DREAMBioFuzzNet.build_DREAMBioFuzzNet_from_file(
+    nohill_network = DREAMBioFuzzNet.DREAMBioFuzzNet.build_DREAMBioFuzzNet_from_file(
         pkn_path
     )
+
+    make_hill_identity(nohill_network)
 
     # Get data with/without noise
     train_true_df, train_input_df, test_true_df, test_input_df = load_and_prepare_data(
@@ -191,30 +194,30 @@ def run_train_with_noise(
             {k: v.numpy() for k, v in test_random_output.items()}
         )
 
-    # UNTRAINED NETWORK without perturbation, same inputs
+    # NoHill NETWORK without perturbation, same inputs
     with torch.no_grad():
-        untrained_network.initialise_random_truth_and_output(test_size)
-        untrained_network.set_network_ground_truth(test_ground_truth)
-        untrained_network.sequential_update(
-            untrained_network.root_nodes, inhibition=no_inhibition_test
+        nohill_network.initialise_random_truth_and_output(test_size)
+        nohill_network.set_network_ground_truth(test_ground_truth)
+        nohill_network.sequential_update(
+            nohill_network.root_nodes, inhibition=no_inhibition_test
         )
         gen_with_i_test = {
             k: v.cpu().numpy()
-            for k, v in untrained_network.output_states.items()
-            if k not in untrained_network.root_nodes
+            for k, v in nohill_network.output_states.items()
+            if k not in nohill_network.root_nodes
         }
         ut_test_with_i_df = pd.DataFrame(gen_with_i_test)
 
-    # UNTRAINED NETWORK without perturbation, random inputs
+    # NoHill NETWORK without perturbation, random inputs
     with torch.no_grad():
-        untrained_network.initialise_random_truth_and_output(test_size)
-        untrained_network.sequential_update(
-            untrained_network.root_nodes, inhibition=no_inhibition_test
+        nohill_network.initialise_random_truth_and_output(test_size)
+        nohill_network.sequential_update(
+            nohill_network.root_nodes, inhibition=no_inhibition_test
         )
         gen_test = {
             k: v.cpu().numpy()
-            for k, v in untrained_network.output_states.items()
-            if k not in untrained_network.root_nodes
+            for k, v in nohill_network.output_states.items()
+            if k not in nohill_network.root_nodes
         }
         ut_test_df = pd.DataFrame(gen_test)
 
@@ -248,8 +251,8 @@ def run_train_with_noise(
             "teacher_true",
             "student_same_input",
             "student_random_input",
-            "untrained_same_input",
-            "untrained_random_input",
+            "nohill_same_input",
+            "nohill_random_input",
             "lm_same_input",
             "lm_random_input",
         ],
@@ -294,18 +297,18 @@ def main(config_path):
 
         losses, unpertubed_data, student, scaler = run_train_with_noise(**config)
 
-        # losses.to_csv(f"{out_dir}{i+1}_losses.csv")
-        # unpertubed_data.to_csv(f"{out_dir}{i+1}_unperturbed.csv")
+        losses.to_csv(f"{out_dir}{i+1}_losses.csv")
+        unpertubed_data.to_csv(f"{out_dir}{i+1}_unperturbed.csv")
 
-        # torch.save({"model_state_dict": student}, f"{out_dir}{i+1}_student.pt")
+        torch.save({"model_state_dict": student}, f"{out_dir}{i+1}_student.pt")
 
         del student
 
-        # with open(f"{out_dir}{i+1}_config.json", "w") as f:
-        #     json.dump(config, f)
+        with open(f"{out_dir}{i+1}_config.json", "w") as f:
+            json.dump(config, f)
 
-        # with open(f"{out_dir}{i+1}_scaler.json", "wb") as f:
-        #     pickle.dump(scaler, f)
+        with open(f"{out_dir}{i+1}_scaler.json", "wb") as f:
+            pickle.dump(scaler, f)
 
 
 if __name__ == "__main__":

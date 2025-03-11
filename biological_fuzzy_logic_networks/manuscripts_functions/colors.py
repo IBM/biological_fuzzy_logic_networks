@@ -35,8 +35,8 @@ perturbation_models_dict = {
     "student_division_random_input": "#D55E00",  # Orange
     "teacher_division_same_input": "#56B4E9",  # Lightblue
     "teacher_division_random_input": "#0072B2",  # Blue
-    "untrained_division_same_input": "#C84A8D",  # Pink
-    "untrained_division_random_input": "#933CEE",  # Purple
+    "nohill_division_same_input": "#C84A8D",  # Pink
+    "nohill_division_random_input": "#933CEE",  # Purple
 }
 
 models_dict = {
@@ -44,8 +44,8 @@ models_dict = {
     "student_random_input": "#D55E00",  # Orange
     "teacher_same_input": "#56B4E9",  # Lightblue
     "teacher_random_input": "#0072B2",  # Blue
-    "untrained_same_input": "#C84A8D",  # Pink
-    "untrained_random_input": "#933CEE",  # Purple
+    "nohill_same_input": "#C84A8D",  # Pink
+    "nohill_random_input": "#933CEE",  # Purple
     "lm_same_input": default_colors["lightgrey"],  # Pink
     "lm_random_input": default_colors["darkgrey"],  # Purple
 }

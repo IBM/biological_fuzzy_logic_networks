@@ -8,8 +8,7 @@
     "BFN_training_params": {
         "epochs": 500,
         "batch_size": 500,
-        "learning_rate": 0.001,
-        "tensors_to_cuda": false
+        "learning_rate": 0.001
         },
     "out_dir": "/dccstor/ipc1/CAR/BFN/Model/Perturbation_Liver/Output/",
     "experiment_name": "BFN_perturb"
