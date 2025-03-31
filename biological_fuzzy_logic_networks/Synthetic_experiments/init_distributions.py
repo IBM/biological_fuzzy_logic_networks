@@ -1,4 +1,5 @@
 from biological_fuzzy_logic_networks.DREAM import DREAMBioFuzzNet
+from biological_fuzzy_logic_networks.utils import make_hill_identity
 
 import torch
 import numpy as np
@@ -38,7 +39,6 @@ def student_teacher_with_init_distribution(
         "epochs": 100,
         "batch_size": 500,
         "learning_rate": 0.001,
-        "tensors_to_cuda": True,
     },
     **extras,
 ):
@@ -48,9 +48,11 @@ def student_teacher_with_init_distribution(
     student_network = DREAMBioFuzzNet.DREAMBioFuzzNet.build_DREAMBioFuzzNet_from_file(
         pkn_path
     )
-    untrained_network = DREAMBioFuzzNet.DREAMBioFuzzNet.build_DREAMBioFuzzNet_from_file(
+    nohill_network = DREAMBioFuzzNet.DREAMBioFuzzNet.build_DREAMBioFuzzNet_from_file(
         pkn_path
     )
+
+    make_hill_identity(nohill_network)
 
     # INHIBITION INPUTS
     no_inhibition = {k: torch.ones(train_size) for k in teacher_network.nodes}
@@ -65,13 +67,13 @@ def student_teacher_with_init_distribution(
             teacher_network.root_nodes, inhibition=no_inhibition
         )
         true_unperturbed_data = {
-            k: v.numpy().flatten()
+            k: v.cpu().numpy().flatten()
             for k, v in teacher_network.output_states.items()
             if k not in teacher_network.root_nodes
         }
         input_data = pd.DataFrame(
             {
-                k: v.numpy().flatten()
+                k: v.cpu().numpy().flatten()
                 for k, v in teacher_network.output_states.items()
                 if k in teacher_network.root_nodes
             }
@@ -87,12 +89,12 @@ def student_teacher_with_init_distribution(
             teacher_network.root_nodes, inhibition=no_inhibition_test
         )
         test_data = {
-            k: v.numpy().flatten()
+            k: v.cpu().numpy().flatten()
             for k, v in teacher_network.output_states.items()
             if k not in teacher_network.root_nodes
         }
         test_input = {
-            k: v.numpy().flatten()
+            k: v.cpu().numpy().flatten()
             for k, v in teacher_network.output_states.items()
             if k in teacher_network.root_nodes
         }
@@ -163,7 +165,9 @@ def student_teacher_with_init_distribution(
             for k, v in student_network.output_states.items()
             if k not in student_network.root_nodes
         }
-        test_output_df = pd.DataFrame({k: v.numpy() for k, v in test_output.items()})
+        test_output_df = pd.DataFrame(
+            {k: v.cpu().numpy() for k, v in test_output.items()}
+        )
 
     # TEST student network random inputs
     with torch.no_grad():
@@ -173,7 +177,7 @@ def student_teacher_with_init_distribution(
         )
 
         test_random_output = {
-            k: v.numpy()
+            k: v.cpu().numpy()
             for k, v in student_network.output_states.items()
             if k not in student_network.root_nodes
         }
@@ -183,28 +187,28 @@ def student_teacher_with_init_distribution(
 
     # UNTRAINED NETWORK same inputs
     with torch.no_grad():
-        untrained_network.initialise_random_truth_and_output(test_size)
-        untrained_network.set_network_ground_truth(test_ground_truth)
-        untrained_network.sequential_update(
-            untrained_network.root_nodes, inhibition=no_inhibition_test
+        nohill_network.initialise_random_truth_and_output(test_size)
+        nohill_network.set_network_ground_truth(test_ground_truth)
+        nohill_network.sequential_update(
+            nohill_network.root_nodes, inhibition=no_inhibition_test
         )
         gen_with_i_test = {
-            k: v.numpy()
-            for k, v in untrained_network.output_states.items()
-            if k not in untrained_network.root_nodes
+            k: v.cpu().numpy()
+            for k, v in nohill_network.output_states.items()
+            if k not in nohill_network.root_nodes
         }
         ut_test_with_i_df = pd.DataFrame(gen_with_i_test)
 
     # UNTRAINED NETWORK random inputs
     with torch.no_grad():
-        untrained_network.initialise_random_truth_and_output(test_size)
-        untrained_network.sequential_update(
-            untrained_network.root_nodes, inhibition=no_inhibition_test
+        nohill_network.initialise_random_truth_and_output(test_size)
+        nohill_network.sequential_update(
+            nohill_network.root_nodes, inhibition=no_inhibition_test
         )
         gen_test = {
-            k: v.numpy()
-            for k, v in untrained_network.output_states.items()
-            if k not in untrained_network.root_nodes
+            k: v.cpu().numpy()
+            for k, v in nohill_network.output_states.items()
+            if k not in nohill_network.root_nodes
         }
         ut_test_df = pd.DataFrame(gen_test)
 
@@ -220,8 +224,8 @@ def student_teacher_with_init_distribution(
             "teacher_true",
             "student_same_input",
             "student_random_input",
-            "untrained_same_input",
-            "untrained_random_input",
+            "nohill_same_input",
+            "nohill_random_input",
         ],
     )
 

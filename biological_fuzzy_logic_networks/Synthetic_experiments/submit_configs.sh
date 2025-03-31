@@ -4,13 +4,17 @@ conda activate biofuzznet2
 echo $CONDA_DEFAULT_ENV
 
 # config_folder=/dccstor/ipc1/CAR/BFN/Model/Noise/Configs/
-config_folder=/dccstor/ipc1/CAR/BFN/Model/init_dists/Configs/
+# config_folder=/dccstor/ipc1/CAR/BFN/Model/init_dists/Configs/
+# config_folder=/dccstor/ipc1/CAR/BFN/Model/MeasuredNodes/Configs/
+config_folder=/dccstor/ipc1/CAR/BFN/Model/Perturbation_Liver/Configs/
 for file in ${config_folder}*config.json
+# for file in ${config_folder}noise*config.json
     do 
         # echo ${file}
         # jbsub -q x86_6h -cores 1+1 -mem 50g python /u/adr/Code/biological_fuzzy_logic_networks/biological_fuzzy_logic_networks/Synthetic_experiments/training_noise.py $file
         # jbsub -q x86_6h -cores 1+1 -mem 50g python /u/adr/Code/biological_fuzzy_logic_networks/biological_fuzzy_logic_networks/Synthetic_experiments/measured_nodes.py  $file
-        jbsub -q x86_1h -cores 1+1 -mem 50g python /u/adr/Code/biological_fuzzy_logic_networks/biological_fuzzy_logic_networks/Synthetic_experiments/init_distributions.py $file
+        # jbsub -q x86_1h -cores 1+1 -mem 50g python /u/adr/Code/biological_fuzzy_logic_networks/biological_fuzzy_logic_networks/Synthetic_experiments/init_distributions.py $file
+        jbsub -q x86_1h -cores 1+1 -mem 50g python /u/adr/Code/biological_fuzzy_logic_networks/biological_fuzzy_logic_networks/Synthetic_experiments/perturbation.py $file
     done
 
 

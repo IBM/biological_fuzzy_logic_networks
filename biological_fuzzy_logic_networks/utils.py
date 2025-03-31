@@ -7,9 +7,11 @@ ALL RIGHTS RESERVED
 import torch
 import networkx as nx
 from typing import Tuple
-from math import exp
+from math import exp, log
 import matplotlib.pyplot as plt
 import numpy as np
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class MSLELoss(torch.nn.Module):
@@ -370,3 +372,14 @@ LossFactory = {
     "MSE": MSE_loss,
     "MSE_entropy": MSE_entropy_loss,
 }
+
+
+def make_hill_identity(G):
+    for e in G.edges:
+        if e[0] in G.biological_nodes:
+            G.edges[e]["layer"].n = torch.nn.Parameter(
+                torch.tensor(log(1.1 - 1), device=device)
+            )
+            G.edges[e]["layer"].K = torch.nn.Parameter(
+                torch.tensor(log(1), device=device)
+            )

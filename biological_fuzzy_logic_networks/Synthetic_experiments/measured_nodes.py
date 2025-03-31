@@ -1,4 +1,5 @@
 from biological_fuzzy_logic_networks.DREAM import DREAMBioFuzzNet
+from biological_fuzzy_logic_networks.utils import make_hill_identity
 
 import torch
 import numpy as np
@@ -25,13 +26,14 @@ def load_and_prepare_data(data_dir, n_nodes_measured: int):
     print(selected_nodes)
 
     train_true_df = train_true_df[selected_nodes]
-    test_true_df = test_true_df[selected_nodes]
+    test_sel_true_df = test_true_df[selected_nodes]
 
     return (
         train_true_df,
         train_input_df,
-        test_true_df,
+        test_sel_true_df,
         test_input_df,
+        test_true_df,  # all nodes for eval
         selected_nodes,
         all_nodes,
     )
@@ -46,7 +48,6 @@ def run_train_measured_nodes(
         "epochs": 100,
         "batch_size": 500,
         "learning_rate": 0.001,
-        "tensors_to_cuda": True,
     },
     **extras,
 ):
@@ -54,16 +55,18 @@ def run_train_measured_nodes(
     student_network = DREAMBioFuzzNet.DREAMBioFuzzNet.build_DREAMBioFuzzNet_from_file(
         pkn_path
     )
-    untrained_network = DREAMBioFuzzNet.DREAMBioFuzzNet.build_DREAMBioFuzzNet_from_file(
+    nohill_network = DREAMBioFuzzNet.DREAMBioFuzzNet.build_DREAMBioFuzzNet_from_file(
         pkn_path
     )
+    make_hill_identity(nohill_network)
 
-    # Get data with/without noise
+    # Get data with and without masked nodes
     (
         train_true_df,
         train_input_df,
         test_true_df,
         test_input_df,
+        test_all_nodes_df,
         selected_nodes,
         all_nodes,
     ) = load_and_prepare_data(data_dir=data_dir, n_nodes_measured=n_nodes_measured)
@@ -121,9 +124,7 @@ def run_train_measured_nodes(
     train_inhibitors = {c: torch.ones(train_size) for c in all_nodes}
     val_inhibitors = {c: torch.ones(val_size) for c in all_nodes}
 
-    student_network.initialise_random_truth_and_output(
-        train_size, to_cuda=BFN_training_params["tensors_to_cuda"]
-    )
+    student_network.initialise_random_truth_and_output(train_size)
     losses, curr_best_val_loss, _ = student_network.conduct_optimisation(
         input=train_input_dict,
         ground_truth=train_dict,
@@ -140,17 +141,12 @@ def run_train_measured_nodes(
 
     no_inhibition_test = {k: torch.ones(test_size) for k in student_network.nodes}
     with torch.no_grad():
-        student_network.initialise_random_truth_and_output(
-            test_size, to_cuda=BFN_training_params["tensors_to_cuda"]
-        )
-        student_network.set_network_ground_truth(
-            test_ground_truth, to_cuda=BFN_training_params["tensors_to_cuda"]
-        )
+        student_network.initialise_random_truth_and_output(test_size)
+        student_network.set_network_ground_truth(test_ground_truth)
 
         student_network.sequential_update(
             student_network.root_nodes,
             inhibition=no_inhibition_test,
-            to_cuda=BFN_training_params["tensors_to_cuda"],
         )
         test_output = {
             k: v.cpu()
@@ -161,13 +157,9 @@ def run_train_measured_nodes(
 
     # TEST student network without perturbation, random inputs
     with torch.no_grad():
-        student_network.initialise_random_truth_and_output(
-            test_size, to_cuda=BFN_training_params["tensors_to_cuda"]
-        )
+        student_network.initialise_random_truth_and_output(test_size)
         student_network.sequential_update(
-            student_network.root_nodes,
-            inhibition=no_inhibition_test,
-            to_cuda=BFN_training_params["tensors_to_cuda"],
+            student_network.root_nodes, inhibition=no_inhibition_test
         )
         test_random_output = {
             k: v.cpu()
@@ -178,30 +170,30 @@ def run_train_measured_nodes(
             {k: v.numpy() for k, v in test_random_output.items()}
         )
 
-    # UNTRAINED NETWORK without perturbation, same inputs
+    # NoHill NETWORK without perturbation, same inputs
     with torch.no_grad():
-        untrained_network.initialise_random_truth_and_output(test_size)
-        untrained_network.set_network_ground_truth(test_ground_truth)
-        untrained_network.sequential_update(
-            untrained_network.root_nodes, inhibition=no_inhibition_test
+        nohill_network.initialise_random_truth_and_output(test_size)
+        nohill_network.set_network_ground_truth(test_ground_truth)
+        nohill_network.sequential_update(
+            nohill_network.root_nodes, inhibition=no_inhibition_test
         )
         gen_with_i_test = {
             k: v.cpu().numpy()
-            for k, v in untrained_network.output_states.items()
-            if k not in untrained_network.root_nodes
+            for k, v in nohill_network.output_states.items()
+            if k not in nohill_network.root_nodes
         }
         ut_test_with_i_df = pd.DataFrame(gen_with_i_test)
 
-    # UNTRAINED NETWORK without perturbation, random inputs
+    # NoHill NETWORK without perturbation, random inputs
     with torch.no_grad():
-        untrained_network.initialise_random_truth_and_output(test_size)
-        untrained_network.sequential_update(
-            untrained_network.root_nodes, inhibition=no_inhibition_test
+        nohill_network.initialise_random_truth_and_output(test_size)
+        nohill_network.sequential_update(
+            nohill_network.root_nodes, inhibition=no_inhibition_test
         )
         gen_test = {
             k: v.cpu().numpy()
-            for k, v in untrained_network.output_states.items()
-            if k not in untrained_network.root_nodes
+            for k, v in nohill_network.output_states.items()
+            if k not in nohill_network.root_nodes
         }
         ut_test_df = pd.DataFrame(gen_test)
 
@@ -223,7 +215,7 @@ def run_train_measured_nodes(
 
     unpertubed_pred_data = pd.concat(
         [
-            all_test,
+            test_all_nodes_df,
             test_output_df,
             test_random_output_df,
             ut_test_with_i_df,
@@ -235,8 +227,8 @@ def run_train_measured_nodes(
             "teacher_true",
             "student_same_input",
             "student_random_input",
-            "untrained_same_input",
-            "untrained_random_input",
+            "nohill_same_input",
+            "nohill_random_input",
             "lm_same_input",
             "lm_random_input",
         ],
