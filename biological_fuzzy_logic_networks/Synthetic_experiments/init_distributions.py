@@ -82,7 +82,7 @@ def student_teacher_with_init_distribution(
 
     # Generate test data without perturbation
     with torch.no_grad():
-        teacher_network.initialise_random_truth_and_output(test_size)
+        teacher_network.initialise_random_truth_and_output(test_size, distribution=dist)
         teacher_network.sequential_update(
             teacher_network.root_nodes, inhibition=no_inhibition_test
         )
